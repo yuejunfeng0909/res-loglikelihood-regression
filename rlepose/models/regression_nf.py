@@ -147,10 +147,10 @@ class RegressFlow(nn.Module):
         if self.training and labels is not None:
             gt_uv = labels['target_uv'].reshape(pred_jts.shape)
             bar_mu = (pred_jts - gt_uv) / sigma
-            # bar_mu_adjusted = bar_mu * labels['target_uv_weight'].reshape(BATCH_SIZE, self.num_joints, 2)
+            bar_mu_adjusted = bar_mu * labels['target_uv_weight'].reshape(BATCH_SIZE, self.num_joints, 2)
             
             # compute the log probability of the data, marginalizing out the unseen joints
-            log_phi = self.flow_m.log_prob(bar_mu.reshape(-1, 2 * NUM_OF_JOINTS),
+            log_phi = self.flow_m.log_prob(bar_mu_adjusted.reshape(-1, 2 * NUM_OF_JOINTS),
                                            mask = labels['target_uv_weight'].reshape(BATCH_SIZE, self.num_joints, 2)
                                            ).reshape(BATCH_SIZE, 1, 1)
             # num_of_seen_data = torch.sum(labels['target_uv_weight'].reshape(BATCH_SIZE, -1), dim=1)
