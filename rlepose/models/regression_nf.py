@@ -8,22 +8,28 @@ from .builder import SPPE
 from .layers.real_nvp import RealNVP
 from .layers.Resnet import ResNet
 
+NUM_OF_JOINTS = 17
 
+# neural network for RealNVP
 def nets():
     return nn.Sequential(nn.Linear(2, 64), nn.LeakyReLU(), nn.Linear(64, 64), nn.LeakyReLU(), nn.Linear(64, 2), nn.Tanh())
-
-
 def nett():
     return nn.Sequential(nn.Linear(2, 64), nn.LeakyReLU(), nn.Linear(64, 64), nn.LeakyReLU(), nn.Linear(64, 2))
 
+def nets_m():
+    return nn.Sequential(nn.Linear(2 * NUM_OF_JOINTS, 64), nn.LeakyReLU(), nn.Linear(64, 64), nn.LeakyReLU(), nn.Linear(64, 2 * NUM_OF_JOINTS), nn.Tanh())
+def nett_m():
+    return nn.Sequential(nn.Linear(2 * NUM_OF_JOINTS, 64), nn.LeakyReLU(), nn.Linear(64, 64), nn.LeakyReLU(), nn.Linear(64, 2 * NUM_OF_JOINTS))
+
 
 class Linear(nn.Module):
+    '''Linear layer with optional weight normalization and bias'''
     def __init__(self, in_channel, out_channel, bias=True, norm=True):
         super(Linear, self).__init__()
         self.bias = bias
         self.norm = norm
         self.linear = nn.Linear(in_channel, out_channel, bias)
-        nn.init.xavier_uniform_(self.linear.weight, gain=0.01)
+        nn.init.xavier_uniform_(self.linear.weight, gain=0.01) # Xavier weight initialization
 
     def forward(self, x):
         y = x.matmul(self.linear.weight.t())
@@ -79,10 +85,19 @@ class RegressFlow(nn.Module):
 
         self.fc_layers = [self.fc_coord, self.fc_sigma]
 
-        prior = distributions.MultivariateNormal(torch.zeros(2), torch.eye(2))
-        masks = torch.from_numpy(np.array([[0, 1], [1, 0]] * 3).astype(np.float32))
+        # prior = distributions.MultivariateNormal(torch.zeros(2), torch.eye(2))
+        # masks = torch.from_numpy(np.array([[0, 1], [1, 0]] * 3).astype(np.float32))
 
-        self.flow = RealNVP(nets, nett, masks, prior)
+        # self.flow = RealNVP(nets, nett, masks, prior)
+        
+        prior_m = distributions.MultivariateNormal(torch.zeros(2 * NUM_OF_JOINTS), torch.eye(2 * NUM_OF_JOINTS))
+        np_mask_m = np.zeros((2, 2 * NUM_OF_JOINTS))
+        for i in range(2):
+            for j in range(i%2, 2 * NUM_OF_JOINTS, 2):
+                np_mask_m[i, j] = 1
+        masks_m = torch.from_numpy(np.array(np_mask_m.tolist() * 3).astype(np.float32))
+        
+        self.flow_m = RealNVP(nets_m, nett_m, masks_m, prior_m)
 
     def _make_fc_layer(self):
         fc_layers = []
@@ -132,10 +147,20 @@ class RegressFlow(nn.Module):
         if self.training and labels is not None:
             gt_uv = labels['target_uv'].reshape(pred_jts.shape)
             bar_mu = (pred_jts - gt_uv) / sigma
-            # (B, K, 2)
-            log_phi = self.flow.log_prob(bar_mu.reshape(-1, 2)).reshape(BATCH_SIZE, self.num_joints, 1)
-
-            nf_loss = torch.log(sigma) - log_phi
+            # bar_mu_adjusted = bar_mu * labels['target_uv_weight'].reshape(BATCH_SIZE, self.num_joints, 2)
+            
+            # compute the log probability of the data, marginalizing out the unseen joints
+            log_phi = self.flow_m.log_prob(bar_mu.reshape(-1, 2 * NUM_OF_JOINTS),
+                                           mask = labels['target_uv_weight'].reshape(BATCH_SIZE, self.num_joints, 2)
+                                           ).reshape(BATCH_SIZE, 1, 1)
+            # num_of_seen_data = torch.sum(labels['target_uv_weight'].reshape(BATCH_SIZE, -1), dim=1)
+            # print(f'\nlog_phi: {log_phi}, weight: ', num_of_seen_data)
+            
+            # distribute the probability to each point
+            num_of_seen_data = torch.sum(
+                labels['target_uv_weight'].reshape(BATCH_SIZE, -1), dim=1
+                ).reshape(BATCH_SIZE, 1, 1)
+            nf_loss = torch.log(sigma) - log_phi / num_of_seen_data
         else:
             nf_loss = None
 

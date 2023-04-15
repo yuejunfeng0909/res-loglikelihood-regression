@@ -40,7 +40,7 @@ class RealNVP(nn.Module):
             log_det_J -= s.sum(dim=1)
         return z, log_det_J
 
-    def log_prob(self, x):
+    def log_prob(self, x, mask = None):
         DEVICE = x.device
         if self.prior.loc.device != DEVICE:
             self.prior.loc = self.prior.loc.to(DEVICE)
@@ -50,6 +50,22 @@ class RealNVP(nn.Module):
             self.prior.precision_matrix = self.prior.precision_matrix.to(DEVICE)
 
         z, logp = self.backward_p(x)
+        prior_log_prob = self.prior.log_prob(z)
+        # print("z", z)
+        # print("prior_log_prob", prior_log_prob)
+        if mask is not None:
+            mask = mask.reshape(-1, 34)
+            # get the indices of the dimensions that are not masked
+            index_not_masked = torch.nonzero(mask == 0).squeeze()
+            
+            # assuming multivariate gaussian prior
+            univariate_gaussian_prior = torch.distributions.Normal(0, 1)
+            
+            for i in index_not_masked:
+                # get the prior log prob of the univariate gaussian
+                prior_log_prob[i[0]] -= univariate_gaussian_prior.log_prob(z[tuple(i.tolist())])
+            
+            # print("adjusted prior_log_prob", prior_log_prob)
         return self.prior.log_prob(z) + logp
 
     def sample(self, batchSize):
