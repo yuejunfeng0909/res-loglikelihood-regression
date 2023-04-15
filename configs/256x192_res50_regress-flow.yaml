@@ -1,9 +1,9 @@
 DATASET:
   TRAIN:
     TYPE: 'Mscoco'
-    ROOT: './data/coco/'
+    ROOT: '/home/junfeng/projects/res-loglikelihood-regression/data/coco/images'
     IMG_PREFIX: 'train2017'
-    ANN: 'annotations/person_keypoints_train2017.json'
+    ANN: '/home/junfeng/projects/res-loglikelihood-regression/data/coco/annotations/person_keypoints_train2017.json'
     AUG:
       FLIP: true
       ROT_FACTOR: 45
@@ -12,15 +12,15 @@ DATASET:
       PROB_HALF_BODY: 0.3
   VAL:
     TYPE: 'Mscoco'
-    ROOT: './data/coco/'
+    ROOT: '/home/junfeng/projects/res-loglikelihood-regression/data/coco/images'
     IMG_PREFIX: 'val2017'
-    ANN: 'annotations/person_keypoints_val2017.json'
+    ANN: '/home/junfeng/projects/res-loglikelihood-regression/data/coco/annotations/person_keypoints_val2017.json'
   TEST:
     TYPE: 'Mscoco_det'
-    ROOT: './data/coco/'
+    ROOT: '/home/junfeng/projects/res-loglikelihood-regression/data/coco/images'
     IMG_PREFIX: 'val2017'
-    DET_FILE: './exp/json/test_det_rcnn.json'
-    ANN: 'annotations/person_keypoints_val2017.json'
+    DET_FILE: '/home/junfeng/projects/res-loglikelihood-regression/exp/json/test_det_rcnn.json'
+    ANN: '/home/junfeng/projects/res-loglikelihood-regression/data/coco/annotations/person_keypoints_val2017.json'
 DATA_PRESET:
   TYPE: 'simple'
   SIGMA: 2
@@ -44,10 +44,10 @@ LOSS:
 TEST:
   HEATMAP2COORD: 'coord'
 TRAIN:
-  WORLD_SIZE: 8
+  WORLD_SIZE: 1
   BATCH_SIZE: 32
   BEGIN_EPOCH: 0
-  END_EPOCH: 270
+  END_EPOCH: 101
   OPTIMIZER: 'adam'
   LR: 0.001
   LR_FACTOR: 0.1
